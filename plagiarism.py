@@ -14,20 +14,21 @@ def get_argument_parser():
 
         Given an ItemsDeliveredRawReport.csv file produced by Surpass,
         this tool generates an Excel file. The Excel file contains as many
-        tabs as there are questions. For each question, the answer for
-        each pair of students is compared using the normalised Levenshtein
-        similarity where 0 means completely different and 1 exactly the
+        tabs as there are questions. For each question, the answers for
+        each pair of students are compared using the normalised Levenshtein
+        similarity where 0 means completely different and 1 means exactly the
         same.
     """)
     argument_parser.add_argument("--input",
-                                default="ItemsDeliveredRawReport.csv",
-                                help="Name of the input CSV file (defaults to ItemsDeliveredRawReport.csv",
-                                metavar="input_file_name.csv"
-                               )
+                                 default="ItemsDeliveredRawReport.csv",
+                                 help="Name of the input CSV file (defaults to ItemsDeliveredRawReport.csv",
+                                 metavar="input_file_name.csv"
+                                )
     argument_parser.add_argument("--output",
-                                default="plagiarism.xlsx",
-                                help="Name of the generated Excel file (defaults to plagiarism.xlsx"
-                               )
+                                 default="plagiarism.xlsx",
+                                 help="Name of the generated Excel file (defaults to plagiarism.xlsx",
+                                 metavar="output_file_name.xlsx"
+                                )
     return argument_parser
 
 
@@ -43,19 +44,20 @@ def jobs(input_file):
     for column_name in reactions.columns:
         name = names[column_name.replace("Reactie", "Naam")]
         column = reactions.loc[:, column_name]
-        sheet_name = name.replace("[", "").replace("]", "").replace("*", "").replace(":", "").replace("?", "").replace("/", "").replace("\\", "")[-31:]
         yield column, name
 
 
 def worker(job):
     column, name = job
     print(f"{name} [start]")
+
     try:
         df = column.apply(partial(similarity, column), convert_dtype=False)
         print(f"{name} [done]")
     except TypeError:
         df = None
         print(f"{name} [error]")
+
     return df, name
 
 
