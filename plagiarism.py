@@ -11,10 +11,10 @@ def get_argument_parser():
     argumentParser = argparse.ArgumentParser(description="""
         Plagiarism detection tool for Surpass.
 
-        Given a ItemsDeliveredRawReport.csv file produced by Surpass,
+        Given an ItemsDeliveredRawReport.csv file produced by Surpass,
         this tool generates an Excel file. The Excel file contains as many
         tabs as there are questions. For each question, the answer for
-        each pair is compared using the normalised Levenshtein
+        each pair of students is compared using the normalised Levenshtein
         similarity where 0 means completely different and 1 exactly the
         same.
     """)
@@ -60,7 +60,7 @@ def detect_plagiarism(input_file, output_file):
                 'max_value': 1.0,
                 'min_type': 'num',
                 'mid_type': 'num',
-                'max_type': 'max',
+                'max_type': 'num',
                 'min_color': '#00FF00',
                 'mid_color': '#FFFF00',
                 'max_color': '#FF0000'
