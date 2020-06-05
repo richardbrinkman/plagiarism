@@ -1,6 +1,7 @@
 import argparse
 from strsimpy.normalized_levenshtein import NormalizedLevenshtein
 from functools import partial
+from multiprocessing import Pool
 import numpy
 import pandas
 
@@ -8,7 +9,7 @@ normalized_levenshtein = NormalizedLevenshtein()
 
 
 def get_argument_parser():
-    argumentParser = argparse.ArgumentParser(description="""
+    argument_parser = argparse.ArgumentParser(description="""
         Plagiarism detection tool for Surpass.
 
         Given an ItemsDeliveredRawReport.csv file produced by Surpass,
@@ -18,62 +19,75 @@ def get_argument_parser():
         similarity where 0 means completely different and 1 exactly the
         same.
     """)
-    argumentParser.add_argument("--input",
+    argument_parser.add_argument("--input",
                                 default="ItemsDeliveredRawReport.csv",
                                 help="Name of the input CSV file (defaults to ItemsDeliveredRawReport.csv",
                                 metavar="input_file_name.csv"
                                )
-    argumentParser.add_argument("--output",
+    argument_parser.add_argument("--output",
                                 default="plagiarism.xlsx",
                                 help="Name of the generated Excel file (defaults to plagiarism.xlsx"
                                )
-    return argumentParser
+    return argument_parser
 
 
 def similarity(string_series, string):
     return string_series.apply(partial(normalized_levenshtein.similarity, string), convert_dtype=False)
 
 
-def detect_plagiarism(input_file, output_file):
+def jobs(input_file):
     csv = pandas.read_csv(input_file, index_col='Reference')
     names = csv.iloc[:, csv.columns.str.startswith('Naam')].dropna().iloc[0, :]
     reactions = csv.iloc[:, csv.columns.str.startswith('Reactie')].replace(numpy.nan, "", regex=True)
-    print(reactions.head())
-
-    writer = pandas.ExcelWriter(output_file, engine="xlsxwriter")
 
     for column_name in reactions.columns:
         name = names[column_name.replace("Reactie", "Naam")]
-        print("#", name)
         column = reactions.loc[:, column_name]
-        try:
-            df = column.apply(partial(similarity, column), convert_dtype=False)
-            print(df)
-            sheet_name = name.replace("[", "").replace("]", "").replace("*", "").replace(":", "").replace("?", "").replace("/", "").replace("\\", "")[-31:]
-            df.to_excel(writer, sheet_name=sheet_name)
-            rows, columns = df.shape
-            worksheet = writer.sheets[sheet_name]
-            worksheet.conditional_format(1, 1, rows + 1, columns + 1, {
-                'type': '3_color_scale',
-                'min_value': 0.0,
-                'mid_value': 0.5,
-                'max_value': 1.0,
-                'min_type': 'num',
-                'mid_type': 'num',
-                'max_type': 'num',
-                'min_color': '#00FF00',
-                'mid_color': '#FFFF00',
-                'max_color': '#FF0000'
-            })
-        except:
-            pass
-        print()
+        sheet_name = name.replace("[", "").replace("]", "").replace("*", "").replace(":", "").replace("?", "").replace("/", "").replace("\\", "")[-31:]
+        yield column, name
+
+
+def worker(job):
+    column, name = job
+    print(f"{name} [start]")
+    try:
+        df = column.apply(partial(similarity, column), convert_dtype=False)
+        print(f"{name} [done]")
+    except TypeError:
+        df = None
+        print(f"{name} [error]")
+    return df, name
+
+
+def detect_plagiarism(input_file, output_file):
+    writer = pandas.ExcelWriter(output_file, engine="xlsxwriter")
+
+    with Pool() as pool:
+        for df, name in pool.imap(worker, jobs(input_file)):
+            if df is not None:
+                sheet_name = name.replace("[", "").replace("]", "").replace("*", "").replace(":", "").replace("?", "").replace("/", "").replace("\\", "")[-31:]
+                df.to_excel(writer, sheet_name=sheet_name)
+                rows, columns = df.shape
+                worksheet = writer.sheets[sheet_name]
+                worksheet.conditional_format(1, 1, rows + 1, columns + 1, {
+                    'type': '3_color_scale',
+                    'min_value': 0.0,
+                    'mid_value': 0.5,
+                    'max_value': 1.0,
+                    'min_type': 'num',
+                    'mid_type': 'num',
+                    'max_type': 'num',
+                    'min_color': '#00FF00',
+                    'mid_color': '#FFFF00',
+                    'max_color': '#FF0000'
+                })
+                print(f"{name} [written]")
 
     writer.close()
 
 
 if __name__ == "__main__":
-    argumentParser = get_argument_parser()
-    arguments = argumentParser.parse_args()
+    argument_parser = get_argument_parser()
+    arguments = argument_parser.parse_args()
 
     detect_plagiarism(arguments.input, arguments.output)
