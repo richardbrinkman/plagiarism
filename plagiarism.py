@@ -1,9 +1,10 @@
 import argparse
 from strsimpy.normalized_levenshtein import NormalizedLevenshtein
 from functools import partial
-from multiprocessing import Pool
+from multiprocessing import Pipe, Pool
 import numpy
 import pandas
+import sys
 
 normalized_levenshtein = NormalizedLevenshtein()
 
@@ -36,10 +37,15 @@ def similarity(string_series, string):
     return string_series.apply(partial(normalized_levenshtein.similarity, string), convert_dtype=False)
 
 
-def jobs(input_file):
+def read_csv(input_file):
     csv = pandas.read_csv(input_file, index_col='Reference')
     names = csv.iloc[:, csv.columns.str.startswith('Naam')].dropna().iloc[0, :]
     reactions = csv.iloc[:, csv.columns.str.startswith('Reactie')].replace(numpy.nan, "", regex=True)
+    return names, reactions
+
+
+def jobs(input_file):
+    names, reactions = read_csv(input_file)
 
     for column_name in reactions.columns:
         name = names[column_name.replace("Reactie", "Naam")]
@@ -47,25 +53,26 @@ def jobs(input_file):
         yield column, name
 
 
-def worker(job):
+def worker(job, client_connection):
     column, name = job
-    print(f"{name} [start]")
-
+    print(f"{name} [processing]")
+    client_connection.send(("processing", name))
     try:
         df = column.apply(partial(similarity, column), convert_dtype=False)
-        print(f"{name} [done]")
+        print(f"{name} [processed]")
+        client_connection.send(("processed", name))
     except TypeError:
         df = None
         print(f"{name} [error]")
-
+        client_connection.send(("error", name))
     return df, name
 
 
-def detect_plagiarism(input_file, output_file):
+def detect_plagiarism(input_file, output_file, client_connection):
     writer = pandas.ExcelWriter(output_file, engine="xlsxwriter")
 
     with Pool() as pool:
-        for df, name in pool.imap(worker, jobs(input_file)):
+        for df, name in pool.imap(partial(worker, client_connection=client_connection), jobs(input_file)):
             if df is not None:
                 sheet_name = name.replace("[", "").replace("]", "").replace("*", "").replace(":", "").replace("?", "").replace("/", "").replace("\\", "")[-31:]
                 df.to_excel(writer, sheet_name=sheet_name)
@@ -83,7 +90,8 @@ def detect_plagiarism(input_file, output_file):
                     'mid_color': '#FFFF00',
                     'max_color': '#FF0000'
                 })
-                print(f"{name} [written]")
+                print(f"{name} [done]")
+                client_connection.send(("done", name))
 
     writer.close()
 
@@ -91,5 +99,5 @@ def detect_plagiarism(input_file, output_file):
 if __name__ == "__main__":
     argument_parser = get_argument_parser()
     arguments = argument_parser.parse_args()
-
-    detect_plagiarism(arguments.input, arguments.output)
+    _, client_connection = Pipe()
+    detect_plagiarism(arguments.input, arguments.output, client_connection)

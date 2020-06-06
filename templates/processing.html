@@ -1,0 +1,45 @@
+{% extends "layout.html" %}
+
+{% block body %}
+    <h1>Detecting Plagiarism...</h1>
+    <label for="progress">Progress:</label>
+    <progress id="progress" value="0" max="{{ count }}"></progress>
+    <p id="{{ md5 }}" hidden>
+        Plagiarism detection completed. You can download the generated
+        <a href="/static/{{ md5 }}/plagiarism.xlsx">plagiarism.xlsx</a>.
+    </p>
+
+    <table>
+        <thead>
+            <tr>
+                <th>question name</th>
+                <th>status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for name in names %}
+                <tr>
+                    <td>{{ name }}</td>
+                    <td id="{{ name }}">queued</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <script>
+        var source = new EventSource("/progress/{{ md5 }}");
+        var progress = document.getElementById("progress");
+        source.onmessage = function (event) {
+            var data = JSON.parse(event.data);
+            if (data["status"] == "completed") {
+                document.getElementById("{{ md5 }}").hidden = false;
+                progress.value = progress.max
+                source.close();
+                location.replace("/static/{{ md5 }}/plagiarism.xlsx")
+            } else
+                document.getElementById(data["name"]).innerText = data["status"];
+                if (data["status"] == "processed")
+                    progress.value = progress.value + 1;
+        }
+    </script>
+{% endblock %}
