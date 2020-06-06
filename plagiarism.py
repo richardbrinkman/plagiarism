@@ -92,6 +92,7 @@ def detect_plagiarism(input_file, output_file, client_connection):
                 print(f"{name} [done]")
                 client_connection.send(("done", name))
 
+    client_connection.send(("completed", None))
     writer.close()
 
 

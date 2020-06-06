@@ -12,8 +12,8 @@
     <table>
         <thead>
             <tr>
-                <th>question name</th>
-                <th>status</th>
+                <th style="text-align: left">question name</th>
+                <th style="text-align: left">status</th>
             </tr>
         </thead>
         <tbody>
@@ -38,7 +38,7 @@
                 location.replace("/static/{{ md5 }}/plagiarism.xlsx")
             } else
                 document.getElementById(data["name"]).innerText = data["status"];
-                if (data["status"] == "processed")
+                if (data["status"] == "processed" || data["status"] == "error")
                     progress.value = progress.value + 1;
         }
     </script>

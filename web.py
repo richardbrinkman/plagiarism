@@ -4,10 +4,13 @@ import plagiarism
 import os
 from flask import Flask, Response, render_template, request, redirect
 from multiprocessing import Pipe, Process
+from threading import Thread
+from time import sleep
 
 UPLOAD_DIR = os.path.join(".", "static")
 app = Flask(__name__)
-parent_connection = {}
+parent_connections = {}
+child_connections = {}
 
 
 @app.route("/")
@@ -27,8 +30,8 @@ def detect():
     with open(input_file, "wb") as csv_file:
         csv_file.write(csv_data)
     names, _ = plagiarism.read_csv(input_file)
-    parent_connection[md5], child_connection = Pipe()
-    process = Process(target=plagiarism.detect_plagiarism, args=(input_file, output_file, child_connection))
+    parent_connections[md5], child_connections[md5] = Pipe()
+    process = Process(target=plagiarism.detect_plagiarism, args=(input_file, output_file, child_connections[md5]))
     process.start()
     return render_template("processing.html", count=len(names), md5=md5, names=names)
 
@@ -38,16 +41,23 @@ def progress(md5):
     def event_log():
         try:
             while True:
-                status, name = parent_connection[md5].recv()
-                data = json.dumps({"status": status, "name": name})
-                yield f"data: {data}\n\n"
+                status, name = parent_connections[md5].recv()
+                if status is None:
+                    yield ": keep-alive\n"
+                elif status == "completed":
+                    data = json.dumps({"status": "completed"})
+                    yield f"data: {data}\n\n"
+                    break
+                else:
+                    data = json.dumps({"status": status, "name": name})
+                    yield f"data: {data}\n\n"
         except EOFError:
             pass
-        data = json.dumps({"status": "completed"})
-        yield f"data: {data}\n\n"
-        # del parent_connection[md5]
 
-    if md5 in parent_connection:
+        del child_connections[md5]
+        del parent_connections[md5]
+
+    if md5 in parent_connections:
         response = Response(event_log())
         response.headers["content-type"] = "text/event-stream"
         response.headers["cache-control"] = "no-cache"
@@ -55,5 +65,13 @@ def progress(md5):
         return response
 
 
+def keepalive():
+    while True:
+        for md5 in child_connections:
+            child_connections[md5].send((None, None))
+        sleep(20)
+
+
 if __name__ == "__main__":
+    Thread(target=keepalive).start()
     app.run(host="0.0.0.0", port=os.getenv("PORT", 8080), debug=True)
