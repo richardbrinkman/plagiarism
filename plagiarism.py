@@ -4,7 +4,6 @@ from functools import partial
 from multiprocessing import Pipe, Pool
 import numpy
 import pandas
-import sys
 
 normalized_levenshtein = NormalizedLevenshtein()
 
