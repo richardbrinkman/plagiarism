@@ -1,9 +1,10 @@
 import argparse
-from strsimpy.normalized_levenshtein import NormalizedLevenshtein
 from functools import partial
 from multiprocessing import Pipe, Pool
+
 import numpy
 import pandas
+from strsimpy.normalized_levenshtein import NormalizedLevenshtein
 
 normalized_levenshtein = NormalizedLevenshtein()
 
@@ -92,8 +93,8 @@ def detect_plagiarism(input_file, output_file, client_connection):
                 print(f"{name} [done]")
                 client_connection.send(("done", name))
 
-    client_connection.send(("completed", None))
     writer.close()
+    client_connection.send(("completed", None))
 
 
 if __name__ == "__main__":

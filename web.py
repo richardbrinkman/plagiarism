@@ -1,11 +1,13 @@
 import hashlib
 import json
-import plagiarism
 import os
-from flask import Flask, Response, render_template, request, redirect
 from multiprocessing import Pipe, Process
 from threading import Thread
 from time import sleep
+
+from flask import Flask, Response, render_template, request, send_from_directory
+
+import plagiarism
 
 UPLOAD_DIR = os.path.join(".", "static")
 app = Flask(__name__)
@@ -34,6 +36,11 @@ def detect():
     process = Process(target=plagiarism.detect_plagiarism, args=(input_file, output_file, child_connections[md5]))
     process.start()
     return render_template("processing.html", count=len(names), md5=md5, names=names)
+
+
+@app.route('/static/<path:filename>')
+def download_file(filename):
+    return send_from_directory(UPLOAD_DIR, filename, as_attachment=True)
 
 
 @app.route("/progress/<md5>")
