@@ -31,7 +31,7 @@ def detect():
     output_file = os.path.join(directory, "plagiarism.xlsx")
     with open(input_file, "wb") as csv_file:
         csv_file.write(csv_data)
-    names, _ = plagiarism.read_csv(input_file)
+    names = plagiarism.get_names(plagiarism.read_csv(input_file))
     parent_connections[md5], child_connections[md5] = Pipe()
     process = Process(target=plagiarism.detect_plagiarism, args=(input_file, output_file, child_connections[md5]))
     process.start()

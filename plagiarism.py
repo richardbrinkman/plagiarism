@@ -29,7 +29,7 @@ def get_argument_parser():
                                  default="plagiarism.xlsx",
                                  help="Name of the generated Excel file (defaults to plagiarism.xlsx",
                                  metavar="output_file_name.xlsx"
-                                )
+                                 )
     return argument_parser
 
 
@@ -38,14 +38,24 @@ def similarity(string_series, string):
 
 
 def read_csv(input_file):
-    csv = pandas.read_csv(input_file, index_col='Reference')
-    names = csv.iloc[:, csv.columns.str.startswith('Naam')].dropna().iloc[0, :]
-    reactions = csv.iloc[:, csv.columns.str.startswith('Reactie')].replace(numpy.nan, "", regex=True)
-    return names, reactions
+    return pandas.read_csv(input_file, index_col='Reference')
 
 
-def jobs(input_file):
-    names, reactions = read_csv(input_file)
+def get_names(csv):
+    return csv.iloc[:, csv.columns.str.startswith('Naam')].dropna().iloc[0, :]
+
+
+def get_reactions(csv):
+    return csv.iloc[:, csv.columns.str.startswith('Reactie')].replace(numpy.nan, "", regex=True)
+
+
+def student_tab(csv):
+    return csv[["FirstName", "LastName"]]
+
+
+def jobs(csv):
+    names = get_names(csv)
+    reactions = get_reactions(csv)
 
     for column_name in reactions.columns:
         name = names[column_name.replace("Reactie", "Naam")]
@@ -69,12 +79,16 @@ def worker(job, client_connection):
 
 
 def detect_plagiarism(input_file, output_file, client_connection):
+    csv = read_csv(input_file)
     writer = pandas.ExcelWriter(output_file, engine="xlsxwriter")
+    student_tab(csv).to_excel(writer, sheet_name="students")
 
     with Pool() as pool:
-        for df, name in pool.imap(partial(worker, client_connection=client_connection), jobs(input_file)):
+        for df, name in pool.imap(partial(worker, client_connection=client_connection), jobs(csv)):
             if df is not None:
-                sheet_name = name.replace("[", "").replace("]", "").replace("*", "").replace(":", "").replace("?", "").replace("/", "").replace("\\", "")[-31:]
+                sheet_name = name.replace("[", "").replace("]", "").replace("*", "").replace(":", "").replace("?",
+                                                                                                              "").replace(
+                    "/", "").replace("\\", "")[-31:]
                 df.to_excel(writer, sheet_name=sheet_name)
                 rows, columns = df.shape
                 worksheet = writer.sheets[sheet_name]
