@@ -4,6 +4,7 @@ from multiprocessing import Pipe, Pool
 
 import numpy
 import pandas
+import xlsxwriter
 from strsimpy.normalized_levenshtein import NormalizedLevenshtein
 
 normalized_levenshtein = NormalizedLevenshtein()
@@ -53,6 +54,26 @@ def student_tab(csv):
     return csv[["FirstName", "LastName"]]
 
 
+def average_tab(csv, sheet_names):
+    references = csv.index
+    size = len(references)
+    data = [
+        [
+            "=AVERAGE({})".format(",".join([
+                "'{}'!{}".format(
+                    sheet_name,
+                    xlsxwriter.worksheet.xl_rowcol_to_cell(row, column)
+                )
+                for sheet_name in sheet_names
+            ]))
+            for column in range(1, size + 1)
+        ]
+        for row in range(1, size + 1)
+    ]
+    df = pandas.DataFrame(data=data, index=references, columns=references, dtype=str)
+    return df
+
+
 def jobs(csv):
     names = get_names(csv)
     reactions = get_reactions(csv)
@@ -82,6 +103,19 @@ def detect_plagiarism(input_file, output_file, client_connection):
     csv = read_csv(input_file)
     writer = pandas.ExcelWriter(output_file, engine="xlsxwriter")
     student_tab(csv).to_excel(writer, sheet_name="students")
+    conditional_options = {
+        'type': '3_color_scale',
+        'min_value': 0.0,
+        'mid_value': 0.5,
+        'max_value': 1.0,
+        'min_type': 'num',
+        'mid_type': 'num',
+        'max_type': 'num',
+        'min_color': '#00FF00',
+        'mid_color': '#FFFF00',
+        'max_color': '#FF0000'
+    }
+    sheet_names = []
 
     with Pool() as pool:
         for df, name in pool.imap(partial(worker, client_connection=client_connection), jobs(csv)):
@@ -89,24 +123,18 @@ def detect_plagiarism(input_file, output_file, client_connection):
                 sheet_name = name.replace("[", "").replace("]", "").replace("*", "").replace(":", "").replace("?",
                                                                                                               "").replace(
                     "/", "").replace("\\", "")[-31:]
+                sheet_names.append(sheet_name)
                 df.to_excel(writer, sheet_name=sheet_name)
                 rows, columns = df.shape
                 worksheet = writer.sheets[sheet_name]
-                worksheet.conditional_format(1, 1, rows + 1, columns + 1, {
-                    'type': '3_color_scale',
-                    'min_value': 0.0,
-                    'mid_value': 0.5,
-                    'max_value': 1.0,
-                    'min_type': 'num',
-                    'mid_type': 'num',
-                    'max_type': 'num',
-                    'min_color': '#00FF00',
-                    'mid_color': '#FFFF00',
-                    'max_color': '#FF0000'
-                })
+                worksheet.conditional_format(1, 1, rows + 1, columns + 1, conditional_options)
                 print(f"{name} [done]")
                 client_connection.send(("done", name))
 
+    averages = average_tab(csv, sheet_names)
+    averages.to_excel(writer, sheet_name="average")
+    rows, columns = averages.shape
+    writer.sheets["average"].conditional_format(1, 1, rows + 1, columns + 1, conditional_options)
     writer.close()
     client_connection.send(("completed", None))
 
