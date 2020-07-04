@@ -122,7 +122,13 @@ def detect_plagiarism(input_file, output_file, client_connection):
             if df is not None:
                 sheet_name = name.replace("[", "").replace("]", "").replace("*", "").replace(":", "").replace("?",
                                                                                                               "").replace(
-                    "/", "").replace("\\", "")[-31:]
+                    "/", "").replace("\\", "")[-31:].lower()
+                if sheet_name in sheet_names:
+                    sheet_name = sheet_name[:29]
+                    i = 0
+                    while f"{sheet_name}{i:02d}" in sheet_names:
+                        i += 1
+                    sheet_name = f"{sheet_name}{i:02d}"
                 sheet_names.append(sheet_name)
                 df.to_excel(writer, sheet_name=sheet_name)
                 rows, columns = df.shape
