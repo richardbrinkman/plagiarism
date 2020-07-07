@@ -39,7 +39,8 @@ def similarity(string_series, string):
 
 
 def read_csv(input_file):
-    return pandas.read_csv(input_file, index_col='Reference')
+    df = pandas.read_csv(input_file, index_col='Reference')
+    return df[df["Grade"] != "Ongeldig"]
 
 
 def get_names(csv):
