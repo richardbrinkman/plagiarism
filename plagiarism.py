@@ -39,8 +39,8 @@ def similarity(string_series, string):
 
 
 def read_csv(input_file):
-    df = pandas.read_csv(input_file, index_col='Reference')
-    return df[df["Grade"] != "Ongeldig"]
+    df = pandas.read_csv(input_file, index_col='Referentie')
+    return df[df["Cijfer"] != "Ongeldig"]
 
 
 def get_names(csv):
@@ -52,12 +52,12 @@ def get_reactions(csv):
 
 
 def student_tab(csv):
-    return csv[["FirstName", "LastName"]]
+    return csv[["Voornaam", "Achternaam"]]
 
 
 def average_tab(csv, sheet_names):
-    references = csv.index
-    size = len(references)
+    referenties = csv.index
+    size = len(referenties)
     data = [
         [
             "=AVERAGE({})".format(",".join([
@@ -71,7 +71,7 @@ def average_tab(csv, sheet_names):
         ]
         for row in range(1, size + 1)
     ]
-    df = pandas.DataFrame(data=data, index=references, columns=references, dtype=str)
+    df = pandas.DataFrame(data=data, index=referenties, columns=referenties, dtype=str)
     return df
 
 
