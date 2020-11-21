@@ -7,6 +7,8 @@ import pandas
 import xlsxwriter
 from strsimpy.normalized_levenshtein import NormalizedLevenshtein
 
+from ansilogger import AnsiLogger
+
 normalized_levenshtein = NormalizedLevenshtein()
 
 
@@ -31,6 +33,13 @@ def get_argument_parser():
                                  help="Name of the generated Excel file (defaults to plagiarism.xlsx",
                                  metavar="output_file_name.xlsx"
                                  )
+    argument_parser.add_argument("--no-ansi",
+                                 action="store_const",
+                                 const=False,
+                                 default=True,
+                                 dest="use_ansi",
+                                 help="Using this option will prevent ansi colors and line movements"
+                                )
     return argument_parser
 
 
@@ -87,15 +96,12 @@ def jobs(csv):
 
 def worker(job, client_connection):
     column, name = job
-    print(f"{name} [processing]")
     client_connection.send(("processing", name))
     try:
         df = column.apply(partial(similarity, column), convert_dtype=False)
-        print(f"{name} [processed]")
         client_connection.send(("processed", name))
     except TypeError:
         df = None
-        print(f"{name} [error]")
         client_connection.send(("error", name))
     return df, name
 
@@ -135,8 +141,7 @@ def detect_plagiarism(input_file, output_file, client_connection):
                 rows, columns = df.shape
                 worksheet = writer.sheets[sheet_name]
                 worksheet.conditional_format(1, 1, rows + 1, columns + 1, conditional_options)
-                print(f"{name} [done]")
-                client_connection.send(("done", name))
+                client_connection.send(("finished", name))
 
     averages = average_tab(csv, sheet_names)
     averages.to_excel(writer, sheet_name="average")
@@ -149,5 +154,6 @@ def detect_plagiarism(input_file, output_file, client_connection):
 if __name__ == "__main__":
     argument_parser = get_argument_parser()
     arguments = argument_parser.parse_args()
-    _, client_connection = Pipe()
+    parent_connection, client_connection = Pipe()
+    AnsiLogger(parent_connection, arguments.use_ansi).start()
     detect_plagiarism(arguments.input, arguments.output, client_connection)
