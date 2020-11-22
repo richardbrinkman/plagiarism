@@ -1,6 +1,9 @@
+Command line version
+====================
+
 ```
 usage: plagiarism.py [-h] [--input input_file_name.csv]
-                     [--output output_file_name.xlsx]
+                     [--output output_file_name.xlsx] [--no-ansi]
 
 Plagiarism detection tool for Surpass. Given an ItemsDeliveredRawReport.csv
 file produced by Surpass, this tool generates an Excel file. The Excel file
@@ -16,4 +19,13 @@ optional arguments:
   --output output_file_name.xlsx
                         Name of the generated Excel file (defaults to
                         plagiarism.xlsx
+  --no-ansi             Using this option will prevent ansi colors and line
+                        movements
 ```
+
+Web app
+=======
+
+You can also run a webapp with `python3 web.py`. The standard port of 8080 can
+be changed with setting the `PORT` environment variable. You can also start the
+webapp with `PORT=80 python3 web.py`.
