@@ -1,3 +1,4 @@
+filemagic
 flask
 numpy
 pandas

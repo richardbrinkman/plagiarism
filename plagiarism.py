@@ -9,6 +9,19 @@ from strsimpy.normalized_levenshtein import NormalizedLevenshtein
 
 from ansilogger import AnsiLogger
 
+conditional_options = {
+    'type': '3_color_scale',
+    'min_value': 0.0,
+    'mid_value': 0.5,
+    'max_value': 1.0,
+    'min_type': 'num',
+    'mid_type': 'num',
+    'max_type': 'num',
+    'min_color': '#00FF00',
+    'mid_color': '#FFFF00',
+    'max_color': '#FF0000'
+}
+
 normalized_levenshtein = NormalizedLevenshtein()
 
 
@@ -30,7 +43,7 @@ def get_argument_parser():
                                 )
     argument_parser.add_argument("--output",
                                  default="plagiarism.xlsx",
-                                 help="Name of the generated Excel file (defaults to plagiarism.xlsx",
+                                 help="Name of the generated Excel file (defaults to plagiarism.xlsx)",
                                  metavar="output_file_name.xlsx"
                                  )
     argument_parser.add_argument("--no-ansi",
@@ -110,18 +123,6 @@ def detect_plagiarism(input_file, output_file, client_connection):
     csv = read_csv(input_file)
     writer = pandas.ExcelWriter(output_file, engine="xlsxwriter")
     student_tab(csv).to_excel(writer, sheet_name="students")
-    conditional_options = {
-        'type': '3_color_scale',
-        'min_value': 0.0,
-        'mid_value': 0.5,
-        'max_value': 1.0,
-        'min_type': 'num',
-        'mid_type': 'num',
-        'max_type': 'num',
-        'min_color': '#00FF00',
-        'mid_color': '#FFFF00',
-        'max_color': '#FF0000'
-    }
     sheet_names = []
 
     with Pool() as pool:

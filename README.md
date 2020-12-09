@@ -1,5 +1,8 @@
+Surpass plagiarism detection tool
+=================================
+
 Command line version
-====================
+--------------------
 
 ```
 usage: plagiarism.py [-h] [--input input_file_name.csv]
@@ -24,8 +27,36 @@ optional arguments:
 ```
 
 Web app
-=======
+-------
 
 You can also run a webapp with `python3 web.py`. The standard port of 8080 can
 be changed with setting the `PORT` environment variable. You can also start the
 webapp with `PORT=80 python3 web.py`.
+
+Blackboard plagiarism detection tool
+====================================
+
+```
+usage: blackboard.py [-h] [--input assignment.zip] [--output plagiarism.xlsx]
+Plagiarism detection tool for Blackboard. Given a zip file exported by
+Blackboard, this tool generates an Excel file. The Excel file contains a
+matrix where the assignment of each student is compared each other student.
+
+The following file types are supported. Some require external tools to convert it to text.
+
+.pdf: pdftotext is required
+.odt, .docx: pandoc is required
+.db, .sqlite: sqlite3 is required
+.csv, .txt, .md or something with mime-type text/*
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --input assignment.zip
+                        Name of the ZIP file or the directory of the unzipped
+                        file
+  --output plagiarism.xlsx
+                        Name of the generated Excel file (defaults to
+                        plagiarism.xlsx)
+  --no-ansi             Using this option will prevent ansi colors and line
+                        movements
+```
