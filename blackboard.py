@@ -34,7 +34,7 @@ def text_reader(filename):
         return file.read()
 
 
-@lru_cache
+@lru_cache(maxsize=256)
 def convert_file_to_string(filename):
     converters = {
         '^application/csv$': text_reader,
