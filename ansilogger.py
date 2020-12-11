@@ -1,3 +1,4 @@
+import sys
 from threading import Thread
 
 
@@ -15,6 +16,8 @@ class AnsiLogger(Thread):
     def __init__(self, parent_connection, use_ansi=True):
         super().__init__()
         self.parent_connection = parent_connection
+        if not sys.stdout.isatty():
+            use_ansi = False
         if use_ansi:
             self.question_rows = dict()
             self.current_row = 0
