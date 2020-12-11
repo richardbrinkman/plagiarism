@@ -1,4 +1,5 @@
 import argparse
+import difflib
 import magic
 import os
 import pandas
@@ -11,7 +12,6 @@ from ansilogger import AnsiLogger
 from functools import lru_cache, partial
 from multiprocessing import Pipe, Pool
 from plagiarism import conditional_options
-from strsimpy.normalized_levenshtein import NormalizedLevenshtein
 
 
 def pandoc_reader(filename):
@@ -64,10 +64,11 @@ def compare(directory, client_connection, pair):
     message = f'comparison between {shortify_name(pair[0])} and {shortify_name(pair[1])}'
     client_connection.send(('processing',  message))
     try:
-        similarity = NormalizedLevenshtein().similarity(
+        similarity = difflib.SequenceMatcher(
+            lambda x: str(x) in ' \t\n',
             convert_file_to_string(os.path.join(directory, pair[0])),
             convert_file_to_string(os.path.join(directory, pair[1]))
-        )
+        ).ratio()
         client_connection.send(('processed', message))
         return pair, similarity
     except RuntimeError:

@@ -1,11 +1,11 @@
 import argparse
+import difflib
 from functools import partial
 from multiprocessing import Pipe, Pool
 
 import numpy
 import pandas
 import xlsxwriter
-from strsimpy.normalized_levenshtein import NormalizedLevenshtein
 
 from ansilogger import AnsiLogger
 
@@ -21,8 +21,6 @@ conditional_options = {
     'mid_color': '#FFFF00',
     'max_color': '#FF0000'
 }
-
-normalized_levenshtein = NormalizedLevenshtein()
 
 
 def get_argument_parser():
@@ -56,8 +54,12 @@ def get_argument_parser():
     return argument_parser
 
 
+def diff_ratio(a, b):
+    return difflib.SequenceMatcher(lambda x: str(x) in ' \t\n', a, b).ratio()
+
+
 def similarity(string_series, string):
-    return string_series.apply(partial(normalized_levenshtein.similarity, string), convert_dtype=False)
+    return string_series.apply(partial(diff_ratio, string), convert_dtype=False)
 
 
 def read_csv(input_file):

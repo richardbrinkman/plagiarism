@@ -2,5 +2,4 @@ filemagic
 flask
 numpy
 pandas
-strsimpy
 xlsxwriter
