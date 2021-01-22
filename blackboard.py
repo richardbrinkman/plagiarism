@@ -101,15 +101,22 @@ def detect_plagiarism_in_directory(directory, output_file, client_connection):
         for (x, y), similarity in pool.imap_unordered(partial(compare, directory, client_connection), pairs):
             df.loc[x, y] = similarity
             df.loc[y, x] = similarity
-    shortified_names = [shortify_name(file) for file in non_metafiles]
-    df.columns = shortified_names
-    df.index = shortified_names
+    students = student_tab(directory, metafiles)
+    student_series = students['name']
+    multi_index = pandas.MultiIndex.from_tuples(
+        [(student_series[student_number], non_metafile)
+         for non_metafile in non_metafiles
+         for student_number in re.findall(r'^.+_(\d{6})_poging_.+$', non_metafile)
+        ]
+    )
+    df.columns = multi_index
+    df.index = multi_index
     writer = pandas.ExcelWriter(output_file, engine="xlsxwriter")
-    student_tab(directory, metafiles).to_excel(writer, sheet_name='students')
+    students.to_excel(writer, sheet_name='students')
     df.to_excel(writer, sheet_name='similarity')
     rows, columns = df.shape
     worksheet = writer.sheets['similarity']
-    worksheet.conditional_format(1, 1, rows + 1, columns + 1, conditional_options)
+    worksheet.conditional_format(2, 1, rows + 2, columns + 1, conditional_options)
     writer.close()
 
 
