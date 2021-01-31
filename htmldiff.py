@@ -1,15 +1,10 @@
 import difflib
 import sys
+from blackboard import convert_file_to_string
 
-file1 = sys.argv[1]
-file2 = sys.argv[2]
+content1 = str(convert_file_to_string(sys.argv[1])).split('\n')
+content2 = str(convert_file_to_string(sys.argv[2])).split('\n')
 output = sys.argv[3] if len(sys.argv) == 4 else 'diff.html'
-
-with open(file1) as file:
-    content1 = file.readlines()
-
-with open(file2) as file:
-    content2 = file.readlines()
 
 diff = difflib.HtmlDiff(wrapcolumn=60)
 
