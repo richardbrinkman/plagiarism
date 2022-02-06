@@ -62,51 +62,47 @@ def similarity(string_series, string):
     return string_series.apply(partial(diff_ratio, string), convert_dtype=False)
 
 
-def read_csv(input_file):
-    df = pandas.read_csv(input_file, index_col='Referentie')
-    return df[df["Cijfer"] != "Ongeldig"]
+class SurpassSource:
+    def __init__(self, input_file):
+        df = pandas.read_csv(input_file, index_col='Referentie')
+        self.df = df[df["Cijfer"] != "Ongeldig"]
 
+    def get_names(self):
+        return self.df.iloc[:, self.df.columns.str.startswith('Naam')].dropna().iloc[0, :]
 
-def get_names(csv):
-    return csv.iloc[:, csv.columns.str.startswith('Naam')].dropna().iloc[0, :]
+    def get_reactions(self):
+        return self.df.iloc[:, self.df.columns.str.startswith('Reactie')].replace(numpy.nan, "", regex=True)
 
+    def student_tab(self):
+        return self.df[["Voornaam", "Achternaam"]]
 
-def get_reactions(csv):
-    return csv.iloc[:, csv.columns.str.startswith('Reactie')].replace(numpy.nan, "", regex=True)
-
-
-def student_tab(csv):
-    return csv[["Voornaam", "Achternaam"]]
-
-
-def average_tab(csv, sheet_names):
-    referenties = csv.index
-    size = len(referenties)
-    data = [
-        [
-            "=AVERAGE({})".format(",".join([
-                "'{}'!{}".format(
-                    sheet_name,
-                    xlsxwriter.worksheet.xl_rowcol_to_cell(row, column)
-                )
-                for sheet_name in sheet_names
-            ]))
-            for column in range(1, size + 1)
+    def average_tab(self, sheet_names):
+        referenties = self.df.index
+        size = len(referenties)
+        data = [
+            [
+                "=AVERAGE({})".format(",".join([
+                    "'{}'!{}".format(
+                        sheet_name,
+                        xlsxwriter.worksheet.xl_rowcol_to_cell(row, column)
+                    )
+                    for sheet_name in sheet_names
+                ]))
+                for column in range(1, size + 1)
+            ]
+            for row in range(1, size + 1)
         ]
-        for row in range(1, size + 1)
-    ]
-    df = pandas.DataFrame(data=data, index=referenties, columns=referenties, dtype=str)
-    return df
+        df = pandas.DataFrame(data=data, index=referenties, columns=referenties, dtype=str)
+        return df
 
+    def jobs(self):
+        names = get_names(self.df)
+        reactions = get_reactions(self.df)
 
-def jobs(csv):
-    names = get_names(csv)
-    reactions = get_reactions(csv)
-
-    for column_name in reactions.columns:
-        name = names[column_name.replace("Reactie", "Naam")]
-        column = reactions.loc[:, column_name]
-        yield column, name
+        for column_name in reactions.columns:
+            name = names[column_name.replace("Reactie", "Naam")]
+            column = reactions.loc[:, column_name]
+            yield column, name
 
 
 def worker(job, client_connection):
@@ -122,13 +118,13 @@ def worker(job, client_connection):
 
 
 def detect_plagiarism(input_file, output_file, client_connection):
-    csv = read_csv(input_file)
+    source = SurpassSource(input_file)
     writer = pandas.ExcelWriter(output_file, engine="xlsxwriter")
-    student_tab(csv).to_excel(writer, sheet_name="students")
+    source.student_tab().to_excel(writer, sheet_name="students")
     sheet_names = []
 
     with Pool() as pool:
-        for df, name in pool.imap(partial(worker, client_connection=client_connection), jobs(csv)):
+        for df, name in pool.imap(partial(worker, client_connection=client_connection), source.jobs()):
             if df is not None:
                 sheet_name = name.replace("[", "").replace("]", "").replace("*", "").replace(":", "").replace("?",
                                                                                                               "").replace(
@@ -146,7 +142,7 @@ def detect_plagiarism(input_file, output_file, client_connection):
                 worksheet.conditional_format(1, 1, rows + 1, columns + 1, conditional_options)
                 client_connection.send(("finished", name))
 
-    averages = average_tab(csv, sheet_names)
+    averages = average_tab(source, sheet_names)
     averages.to_excel(writer, sheet_name="average")
     rows, columns = averages.shape
     writer.sheets["average"].conditional_format(1, 1, rows + 1, columns + 1, conditional_options)
