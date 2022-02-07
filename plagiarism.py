@@ -1,8 +1,10 @@
 import argparse
 import difflib
+from abc import ABCMeta, abstractmethod
 from functools import partial
 from multiprocessing import Pipe, Pool
 
+import magic
 import numpy
 import pandas
 import xlsxwriter
@@ -25,9 +27,10 @@ conditional_options = {
 
 def get_argument_parser():
     argument_parser = argparse.ArgumentParser(description="""
-        Plagiarism detection tool for Surpass.
+        Plagiarism detection tool for Surpass and TestVision.
 
-        Given an ItemsDeliveredRawReport.csv file produced by Surpass,
+        Given an ItemsDeliveredRawReport.csv file produced by Surpass or 
+        the resultaten_antwoorden.xlsx from TestVision,
         this tool generates an Excel file. The Excel file contains as many
         tabs as there are questions. For each question, the answers for
         each pair of students are compared using the normalised Levenshtein
@@ -36,9 +39,9 @@ def get_argument_parser():
     """)
     argument_parser.add_argument("--input",
                                  default="ItemsDeliveredRawReport.csv",
-                                 help="Name of the input CSV file (defaults to ItemsDeliveredRawReport.csv",
+                                 help="Name of the input CSV file or XLSX (defaults to ItemsDeliveredRawReport.csv",
                                  metavar="input_file_name.csv"
-                                )
+                                 )
     argument_parser.add_argument("--output",
                                  default="plagiarism.xlsx",
                                  help="Name of the generated Excel file (defaults to plagiarism.xlsx)",
@@ -62,23 +65,22 @@ def similarity(string_series, string):
     return string_series.apply(partial(diff_ratio, string), convert_dtype=False)
 
 
-class SurpassSource:
-    def __init__(self, input_file):
-        df = pandas.read_csv(input_file, index_col='Referentie')
-        self.df = df[df["Cijfer"] != "Ongeldig"]
-
+class Source(metaclass=ABCMeta):
+    @abstractmethod
     def get_names(self):
-        return self.df.iloc[:, self.df.columns.str.startswith('Naam')].dropna().iloc[0, :]
+        pass
 
-    def get_reactions(self):
-        return self.df.iloc[:, self.df.columns.str.startswith('Reactie')].replace(numpy.nan, "", regex=True)
-
+    @abstractmethod
     def student_tab(self):
-        return self.df[["Voornaam", "Achternaam"]]
+        pass
+
+    @abstractmethod
+    def jobs(self):
+        pass
 
     def average_tab(self, sheet_names):
-        referenties = self.df.index
-        size = len(referenties)
+        index = self.student_index()
+        size = len(index)
         data = [
             [
                 "=AVERAGE({})".format(",".join([
@@ -92,24 +94,72 @@ class SurpassSource:
             ]
             for row in range(1, size + 1)
         ]
-        df = pandas.DataFrame(data=data, index=referenties, columns=referenties, dtype=str)
+        df = pandas.DataFrame(data=data, index=index, columns=index, dtype=str)
         return df
 
+
+class SurpassSource(Source):
+    def __init__(self, input_file):
+        df = pandas.read_csv(input_file, index_col='Referentie')
+        self.df = df[df["Cijfer"] != "Ongeldig"]
+
+    def get_names(self):
+        return self.df.iloc[:, self.df.columns.str.startswith('Naam')].dropna().iloc[0, :]
+
+    def get_answers(self):
+        return self.df.iloc[:, self.df.columns.str.startswith('Reactie')].replace(numpy.nan, "", regex=True)
+
+    def student_tab(self):
+        return self.df[["Voornaam", "Achternaam"]]
+
     def jobs(self):
-        names = get_names(self.df)
-        reactions = get_reactions(self.df)
+        names = self.get_names(self.df)
+        reactions = self.get_answers(self.df)
 
         for column_name in reactions.columns:
             name = names[column_name.replace("Reactie", "Naam")]
-            column = reactions.loc[:, column_name]
-            yield column, name
+            answers = reactions.loc[:, column_name]
+            yield answers, name
+
+    def student_index(self):
+        return self.df.index
+
+
+class TestvisionSource(Source):
+
+    def __init__(self, input_file):
+        with magic.Magic(flags=magic.MAGIC_MIME_TYPE) as m:
+            mime_type = m.id_filename(input_file)
+            if mime_type == 'application/csv':
+                df = pandas.read_csv(input_file, index_col='KandidaatId')
+            elif mime_type == 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':
+                df = pandas.read_excel(input_file, index_col='KandidaatId', sheet_name='Data')
+        self.df = df[df["OngeldigePogingen"] == 0]
+
+    def get_names(self):
+        return self.df['VraagNaam'].unique()
+
+    def student_tab(self):
+        return self.df[['KandidaatWeergavenaam']].drop_duplicates()
+
+    def jobs(self):
+        for name in self.get_names():
+            filtered = self.df[self.df['VraagNaam'] == name]
+            if filtered['VraagVorm'].iloc[0] in ['Open', 'Invul', 'InvulNumeriek', 'MeervoudigInvul']:
+                answers = filtered['antwoord']
+            else:
+                answers = filtered['keuzeantwoord']
+            yield answers.replace(numpy.nan, ""), name
+
+    def student_index(self):
+        return self.df['KandidaatWeergavenaam'].unique()
 
 
 def worker(job, client_connection):
-    column, name = job
+    answers, name = job
     client_connection.send(("processing", name))
     try:
-        df = column.apply(partial(similarity, column), convert_dtype=False)
+        df = answers.apply(partial(similarity, answers), convert_dtype=False)
         client_connection.send(("processed", name))
     except TypeError:
         df = None
@@ -117,8 +167,23 @@ def worker(job, client_connection):
     return df, name
 
 
+def source_factory(input_file):
+    with magic.Magic(flags=magic.MAGIC_MIME_TYPE) as m:
+        mime_type = m.id_filename(input_file)
+        if mime_type == 'application/csv':
+            with open(input_file) as file:
+                first_line = file.readline()
+            fields = first_line.split(',')
+            if 'KandidaatId' in fields and 'antwoord' in fields and 'VraagNaam' in fields:
+                return TestvisionSource(input_file)
+            else:
+                return SurpassSource(input_file)
+        elif mime_type == 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':
+            return TestvisionSource(input_file)
+
+
 def detect_plagiarism(input_file, output_file, client_connection):
-    source = SurpassSource(input_file)
+    source = source_factory(input_file)
     writer = pandas.ExcelWriter(output_file, engine="xlsxwriter")
     source.student_tab().to_excel(writer, sheet_name="students")
     sheet_names = []
@@ -142,7 +207,7 @@ def detect_plagiarism(input_file, output_file, client_connection):
                 worksheet.conditional_format(1, 1, rows + 1, columns + 1, conditional_options)
                 client_connection.send(("finished", name))
 
-    averages = average_tab(source, sheet_names)
+    averages = source.average_tab(sheet_names)
     averages.to_excel(writer, sheet_name="average")
     rows, columns = averages.shape
     writer.sheets["average"].conditional_format(1, 1, rows + 1, columns + 1, conditional_options)
