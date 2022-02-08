@@ -6,6 +6,7 @@ from threading import Thread
 from time import sleep
 
 from flask import Flask, Response, render_template, request, send_from_directory
+from werkzeug.utils import secure_filename
 
 import plagiarism
 
@@ -23,15 +24,17 @@ def index():
 @app.route("/detect", methods=["POST"])
 def detect():
     with request.files["input_file"].stream as input_file:
-        csv_data = input_file.read()
-    md5 = hashlib.md5(csv_data).hexdigest()
+        source_data = input_file.read()
+    md5 = hashlib.md5(source_data).hexdigest()
     directory = os.path.join(UPLOAD_DIR, md5)
     os.makedirs(directory, exist_ok=True)
-    input_file = os.path.join(directory, "ItemsDeliveredRawReport.csv")
+    filename = secure_filename(request.files["input_file"].filename)
+    input_file = os.path.join(directory, filename)
     output_file = os.path.join(directory, "plagiarism.xlsx")
-    with open(input_file, "wb") as csv_file:
-        csv_file.write(csv_data)
-    names = plagiarism.get_names(plagiarism.read_csv(input_file))
+    with open(input_file, "wb") as source_file:
+        source_file.write(source_data)
+    source = plagiarism.source_factory(input_file)
+    names = source.get_names()
     parent_connections[md5], child_connections[md5] = Pipe()
     process = Process(target=plagiarism.detect_plagiarism, args=(input_file, output_file, child_connections[md5]))
     process.start()

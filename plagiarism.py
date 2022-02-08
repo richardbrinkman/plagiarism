@@ -29,7 +29,7 @@ def get_argument_parser():
     argument_parser = argparse.ArgumentParser(description="""
         Plagiarism detection tool for Surpass and TestVision.
 
-        Given an ItemsDeliveredRawReport.csv file produced by Surpass or 
+        Given an ItemsDeliveredRawReport.csv file produced by Surpass or
         the resultaten_antwoorden.xlsx from TestVision,
         this tool generates an Excel file. The Excel file contains as many
         tabs as there are questions. For each question, the answers for
@@ -113,8 +113,8 @@ class SurpassSource(Source):
         return self.df[["Voornaam", "Achternaam"]]
 
     def jobs(self):
-        names = self.get_names(self.df)
-        reactions = self.get_answers(self.df)
+        names = self.get_names()
+        reactions = self.get_answers()
 
         for column_name in reactions.columns:
             name = names[column_name.replace("Reactie", "Naam")]
@@ -167,19 +167,23 @@ def worker(job, client_connection):
     return df, name
 
 
-def source_factory(input_file):
+def is_testvision_source(input_file):
     with magic.Magic(flags=magic.MAGIC_MIME_TYPE) as m:
         mime_type = m.id_filename(input_file)
         if mime_type == 'application/csv':
             with open(input_file) as file:
                 first_line = file.readline()
             fields = first_line.split(',')
-            if 'KandidaatId' in fields and 'antwoord' in fields and 'VraagNaam' in fields:
-                return TestvisionSource(input_file)
-            else:
-                return SurpassSource(input_file)
+            return 'KandidaatId' in fields and 'antwoord' in fields and 'VraagNaam' in fields
         elif mime_type == 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':
-            return TestvisionSource(input_file)
+            return True
+
+
+def source_factory(input_file):
+    if is_testvision_source(input_file):
+        return TestvisionSource(input_file)
+    else:
+        return SurpassSource(input_file)
 
 
 def detect_plagiarism(input_file, output_file, client_connection):
