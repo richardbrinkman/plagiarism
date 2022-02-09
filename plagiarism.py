@@ -133,7 +133,7 @@ class TestvisionSource(Source):
             if mime_type == 'application/csv':
                 df = pandas.read_csv(input_file, index_col='KandidaatId')
             elif mime_type == 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':
-                df = pandas.read_excel(input_file, index_col='KandidaatId', sheet_name='Data')
+                df = pandas.read_excel(input_file, index_col='KandidaatId', sheet_name='Data', engine='openpyxl')
         self.df = df[df["OngeldigePogingen"] == 0]
 
     def get_names(self):

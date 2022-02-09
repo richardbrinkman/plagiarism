@@ -3,5 +3,4 @@ flask
 numpy
 openpyxl
 pandas
-xlrd
 xlsxwriter
