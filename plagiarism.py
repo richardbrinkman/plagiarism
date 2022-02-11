@@ -133,9 +133,11 @@ class TestvisionSource(Source):
         with magic.Magic(flags=magic.MAGIC_MIME_TYPE) as m:
             mime_type = m.id_filename(input_file)
             if mime_type == 'application/csv' or mime_type == 'text/plain':
-                df = pandas.read_csv(TestVisionCSVSource(input_file), encoding='latin-1', sep=';').set_index('KandidaatExternId')
+                self.index_field = 'KandidaatExternId'
+                df = pandas.read_csv(TestVisionCSVSource(input_file), encoding='latin-1', sep=';').set_index(self.index_field).sort_index()
             elif mime_type == 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':
-                df = pandas.read_excel(input_file, index_col='KandidaatId', sheet_name='Data', engine='openpyxl')
+                self.index_field = 'KandidaatId'
+                df = pandas.read_excel(input_file, index_col=self.index_field, sheet_name='Data', engine='openpyxl').sort_index()
         self.df = df[df["OngeldigePogingen"] == 0]
 
     def get_names(self):
@@ -147,7 +149,10 @@ class TestvisionSource(Source):
     def jobs(self):
         for name in self.get_names():
             filtered = self.df[self.df['VraagNaam'] == name]
-            if filtered['VraagVorm'].iloc[0] in ['Open', 'Invul', 'InvulNumeriek', 'MeervoudigInvul']:
+            question_type = filtered['VraagVorm'].iloc[0]
+            if question_type == 'MeervoudigInvul':
+                answers = filtered.groupby(self.index_field).apply(lambda x: '\n'.join(x['antwoord']))
+            elif question_type in ['Open', 'Invul', 'InvulNumeriek']:
                 answers = filtered['antwoord']
             else:
                 answers = filtered['keuzeantwoord']
