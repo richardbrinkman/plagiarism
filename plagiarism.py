@@ -10,6 +10,8 @@ import pandas
 import xlsxwriter
 
 from ansilogger import AnsiLogger
+from testvision_csv_sanitizer import TestVisionCSVSource
+
 
 conditional_options = {
     'type': '3_color_scale',
@@ -130,8 +132,8 @@ class TestvisionSource(Source):
     def __init__(self, input_file):
         with magic.Magic(flags=magic.MAGIC_MIME_TYPE) as m:
             mime_type = m.id_filename(input_file)
-            if mime_type == 'application/csv':
-                df = pandas.read_csv(input_file, index_col='KandidaatId')
+            if mime_type == 'application/csv' or mime_type == 'text/plain':
+                df = pandas.read_csv(TestVisionCSVSource(input_file), encoding='latin-1', sep=';').set_index('KandidaatExternId')
             elif mime_type == 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':
                 df = pandas.read_excel(input_file, index_col='KandidaatId', sheet_name='Data', engine='openpyxl')
         self.df = df[df["OngeldigePogingen"] == 0]
@@ -170,11 +172,11 @@ def worker(job, client_connection):
 def is_testvision_source(input_file):
     with magic.Magic(flags=magic.MAGIC_MIME_TYPE) as m:
         mime_type = m.id_filename(input_file)
-        if mime_type == 'application/csv':
+        if mime_type == 'application/csv' or 'text/plain':
             with open(input_file) as file:
                 first_line = file.readline()
-            fields = first_line.split(',')
-            return 'KandidaatId' in fields and 'antwoord' in fields and 'VraagNaam' in fields
+            fields = first_line.split(';')
+            return '"KandidaatId"' in fields and '"antwoord"' in fields and '"VraagNaam"' in fields
         elif mime_type == 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':
             return True
 
