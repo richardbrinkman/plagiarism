@@ -177,8 +177,8 @@ def worker(job, client_connection):
 def is_testvision_source(input_file):
     with magic.Magic(flags=magic.MAGIC_MIME_TYPE) as m:
         mime_type = m.id_filename(input_file)
-        if mime_type == 'application/csv' or 'text/plain':
-            with open(input_file) as file:
+        if mime_type == 'application/csv' or mime_type == 'text/plain':
+            with open(input_file, encoding='latin-1') as file:
                 first_line = file.readline()
             fields = first_line.split(';')
             return '"KandidaatId"' in fields and '"antwoord"' in fields and '"VraagNaam"' in fields
