@@ -12,7 +12,6 @@ import xlsxwriter
 from ansilogger import AnsiLogger
 from testvision_csv_sanitizer import TestVisionCSVSource
 
-
 conditional_options = {
     'type': '3_color_scale',
     'min_value': 0.0,
@@ -151,7 +150,7 @@ class TestvisionSource(Source):
             filtered = self.df[self.df['VraagNaam'] == name]
             question_type = filtered['VraagVorm'].iloc[0]
             if question_type == 'MeervoudigInvul':
-                answers = filtered.groupby(self.index_field).apply(lambda x: '\n'.join(x['antwoord']))
+                answers = filtered.groupby(self.index_field).apply(lambda x: '\n'.join(str(x['antwoord'])))
             elif question_type in ['Open', 'Invul', 'InvulNumeriek']:
                 answers = filtered['antwoord']
             else:
