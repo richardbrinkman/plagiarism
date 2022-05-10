@@ -150,11 +150,11 @@ class TestvisionSource(Source):
             filtered = self.df[self.df['VraagNaam'] == name]
             question_type = filtered['VraagVorm'].iloc[0]
             if question_type == 'MeervoudigInvul':
-                answers = filtered.groupby(self.index_field).apply(lambda x: '\n'.join(str(x['antwoord'])))
+                answers = filtered.groupby(self.index_field).apply(lambda x: '\n'.join(str(x['Antwoord'])))
             elif question_type in ['Open', 'Invul', 'InvulNumeriek']:
-                answers = filtered['antwoord']
+                answers = filtered['Antwoord']
             else:
-                answers = filtered['keuzeantwoord']
+                answers = filtered['KeuzeAntwoord']
             yield answers.replace(numpy.nan, ""), name
 
     def student_index(self):
@@ -180,7 +180,7 @@ def is_testvision_source(input_file):
             with open(input_file, encoding='latin-1') as file:
                 first_line = file.readline()
             fields = first_line.split(';')
-            return '"KandidaatId"' in fields and '"antwoord"' in fields and '"VraagNaam"' in fields
+            return '"KandidaatId"' in fields and '"Antwoord"' in fields and '"VraagNaam"' in fields
         elif mime_type == 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':
             return True
 
