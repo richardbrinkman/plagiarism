@@ -53,7 +53,7 @@ def convert_file_to_string(filename):
 
 
 def shortify_name(filename):
-    match = re.match(r'^.+_(?P<student_number>\d+)_poging_\d{4}(?:-\d\d){5}_(?P<filename>.+)$', filename)
+    match = re.match(r'^.+_(?P<student_number>\d+)_attempt_\d{4}(?:-\d\d){5}_(?P<filename>.+)$', filename)
     if match:
         return match['student_number'] + '_' + match['filename']
     else:
@@ -80,7 +80,7 @@ def student_tab(directory, metafiles):
     student_names = dict()
     for absolute_filename in (os.path.join(directory, file) for file in metafiles):
         with open(absolute_filename) as file:
-            match = re.match(r'^Naam: (?P<name>.+) \((?P<student_number>\d+)\)$', file.readline().rstrip())
+            match = re.match(r'^Name: (?P<name>.+) \((?P<student_number>\d+)\)$', file.readline().rstrip())
             if match:
                 student_names[match['student_number']] = match['name']
     return pandas.DataFrame({
@@ -92,7 +92,7 @@ def student_tab(directory, metafiles):
 def detect_plagiarism_in_directory(directory, output_file, client_connection):
     files = os.listdir(directory)
     files.sort()
-    regex = r'^.+_poging_\d{4}(?:-\d\d){5}\.txt'
+    regex = r'^.+_attempt_\d{4}(?:-\d\d){5}\.txt'
     metafiles = [file for file in files if re.match(regex, file)]
     non_metafiles = [file for file in files if not re.match(regex, file)]
     df = pandas.DataFrame(index=non_metafiles, columns=non_metafiles, dtype='float32')
@@ -106,7 +106,7 @@ def detect_plagiarism_in_directory(directory, output_file, client_connection):
     multi_index = pandas.MultiIndex.from_tuples(
         [(student_series[student_number], non_metafile)
          for non_metafile in non_metafiles
-         for student_number in re.findall(r'^.+_(\d{6})_poging_.+$', non_metafile)
+         for student_number in re.findall(r'^.+_(\d{6})_attempt_.+$', non_metafile)
         ]
     )
     df.columns = multi_index
